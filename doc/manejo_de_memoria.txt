@@ -1,0 +1,57 @@
+- Cada proceso tiene un puntero a su propio directorio de paginas.
+  Este puntero va a ser cargado en el registro cr3. Una vez
+  hecho eso, automaticamente se flusheara la TLB.
+  
+- Si suponemos que pueden haber como maximo 8192 - 4 procesos 
+  (dado que en la GDT tenemos utilizadas 4 entradas de las 8192
+  posibles) entonces la cantidad de memoria utilizada por
+  los directorios de pagina seria de unos 32 MB si a esto le agregamos
+  que los procesos tengan ocupadas todas las entradas
+  del directorio, esto requerira aun mas memoria, dado que por
+  cada entrada, vamos a tener una tabla de pagina de 4KB.
+  Por lo tanto aproximadamente un sistema con carga total ocuparia 512 MB
+  de memoria. 
+  
+- Dependiendo de como armemos el esquema de memoria los procesos de
+  usuario usaran mas o menos entradas en su directorio de paginas
+  
+  En el caso de que separemos el espacio de direcciones de usuario
+  de la siguiente manera:
+  
+  | 0x00000000 0xBFFFFFFF | 0xc0000000 0xffffffff | 
+  |       USER SPACE      |     KERNEL SPACE      |
+  
+  Para el usuario solo seran utiles las primeras 768 entradas
+  del directorio de paginas (esto es asi por que cada entrada
+  mapea 4MB de memoria (768*4MB = 3GB)).
+  
+  Para el kernel solo seran utiles las ultimas 256 entradas 
+  (por la misma razon).
+  
+- 1. VIRTUAL ADDRESS -> SELECTOR:OFFSET
+  2. LINEAR  ADDRESS -> | PDIR_IDX | PTABLE_IDX | PG_OFFSET |
+  
+     page_dir[PDIR_IDX][PTABLE_IDX] <- Page table entry
+     
+     La entrada de la tabla de pagina tiene un numero de 20 bits
+     que va a ser la direccion fisica que mapeamos para
+     la linear address recibida.
+     
+     Es decir que para mapear paginas yo deberia devolver estos
+     indices y almacenarlos en las entradas de cada tabla de pagina.
+     
+     Lo que se puede hacer es mantener una lista global de paginas
+     de donde yo pueda sacar marcos libres para asignarlos
+     a estas entradas en una de las entrada de las tablas de paginas
+     del proceso.
+     
+     Van a haber mas de una lista, dado que por ejemplo los dispositivos
+     que usan DMA necesitan direcciones fisicas consecutivas, por lo tanto
+     tenemos que definir zonas de la memoria fisica que se mantengan alineadas
+     y consecutivas. Otras zonas van a ser de caracter general y seguramente
+     vamos a necesitas alguna otra zona mas (por ejemplo la de memoria alta).
+     
+     Estas listas van a residir en una zona de memoria reservada inicial. Esta 
+     estara ubicada al final del kernel, es decir que utilizando el linker
+     exportaremos una variable que nos delimitara la zona de memoria reservada
+     para (valga la redundancia) manejar el manejador de memoria.

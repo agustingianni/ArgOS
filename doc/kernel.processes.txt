@@ -1,0 +1,7 @@
+Procesos del kernel
+
+	- Idle process: Cuando no hay nada para ejecutar. 
+	- Process Swapper: Swapea IN o OUT procesos de la memoria
+	- Page Swapper: Swapea IN o OUT paginas.
+	- Entropy Collector: Colecta entropia para darle a la syscall random()
+	- 

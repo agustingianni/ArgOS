@@ -1,0 +1,57 @@
+CPL (Current Privilege Level): 
+	Se ubica en los primeros 2 bits del registro CS y SS
+	
+DPL (Descriptor Privilege Level):
+	Esta ubicado en el descriptor de segmento en la GDT o LDT
+	Lo que nos dice depende de que tipo de segmento estemos usando
+	
+	Segmento de datos:
+		El DPL indica hasta que privilegio puede acceder a este segmento
+		por ejemplo si tenemos DPL = 2, el segmento puede ser accedido
+		por CPL = 0, 1 o 2.
+		
+		CPL <= DPL
+		
+		
+	Call Gate:
+		Se maneja igual que el segmento de datos
+		
+		CPL <= DPL y RPL <= DPL
+		
+	TSS:
+		Igual que el segmento de datos.
+		
+		CPL <= DPL
+		
+	NonConforming code segment (sin usar un Callgate):
+		El DPL indica el CPL que tiene que tener un proceso para acceder
+		al segmento. Es decir si tenemos DPL != CPL no podemos usarlo.
+
+	Conforming code segment (usando callgate):
+		Si el DPL es 2 entonces los programas corriendo con CPL 0 o 1 no pueden
+		usarlo, solo los que tienen privilegio 2 o 3 pueden.
+		
+RPL (Requested privilege Level):
+	Ubicado en el selector de segmento, permite a un programa utilizar un segmento
+	con privilegio mas bajo que el CPL actual.
+	
+Chequeo de privilegios al acceder a un segmento de codigo nonconforming (normal)
+
+    Si o si el DPL = CPL
+
+Chequeo de privilegios al acceder a un segmento de codigo conforming
+
+    El DPL del segmento pasa a ser igual al CPL del que lo llamo
+    DPL <= CPL es decir que el DPL es el maximo privilegio con el que 
+    puede ser accedido el segmento.
+
+Chequeo de privilegios al acceder segmentos de datos:
+
+	Se carga si y solo si DPL >= CPL && DPL >= RPL sino, protection fault.
+    O sea, el "proceso" mas privilegiado puede acceder a cualquier segmento
+	
+Chequeo de privilegios al cargar el registro SS:
+
+	Se carga si y solo si DPL = CPL = RPL sino, protection fault.
+	En criollo: Cada "proceso" puede acceder a su propia stack.
+ 

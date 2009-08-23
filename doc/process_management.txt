@@ -1,0 +1,79 @@
+Scheduler:
+
+	- Debe ser independiente de la plataforma. No hay necesidad de usar
+	  cosas internas del procesador para el scheduler. 
+	  
+	- Se debe exponer la menor cantidad posible de datos.
+	
+	- La estructura TASK o lo que fuere que implemente debe ser
+	  "normalizada" es decir, usamos tecnicas de DER para hacer
+	  que quede mas coherente. 
+	  Vamos a dividir los datos comunes en estructuras mas 
+	  particulares que nos van a servir mas adelante
+	  
+	- La implementacion del scheduler debe ser modular, es decir
+	  que sea posible cambiarlo cuando se desee.
+	  
+Process:
+	- Compuesto por threads
+	- Estados:
+	
+		* CREATED: Recien creado
+		* TERMINATED: Se puede liberar
+		* RUNNING: Esta siendo ejecutado
+    	* READY: preparado para entrar a la cancha
+    	* BLOCKED: Bloqueado esperando algun evento para pasar a READY
+    	* SWAPPED_AND_READY: El proceso fue swapeado para ganar memoria
+    	  mientras estaba en estado READY.
+    	* SWAPPED_AND_BLOCKED: El proceso fue swapeado para ganar memoria
+    	  mientras estaba en estado BLOCKED.
+	
+	- Transiciones de estado
+	
+		* RUNNING-READY: Se le expiro el QUANTUM
+		* RUNNING-BLOCKED: Entro en IO por ejemplo
+		
+
+Thread:
+	- Es un KernelLand Thread
+	- Stack
+	- Registros
+	- EIP
+	- Priority
+	- CPU utilization
+	- Time Spent Sleeping
+	- Id del evento que esta esperando para ser despertado.
+	- Kernel Stack
+	- TCB
+
+Fiber:
+	- Definido como un UserLand Thread
+	- Beneficio: no hay context switch hacia el kernel, el scheduleo es 
+	  independiente del kernel. Solo se requiere guardar el EIP y los registros
+	  y jumpear al otro hilo.
+	- Problema: Si uno de los Fibers hace una syscall bloqueante cagamos
+	  las peras, por que todos ellos tendrian que esperar a que el fiber termine
+	  
+
+	  
+Estructura TASK:
+
+	Compuesta por:
+	
+	- Informacion generica del proceso, pid, gid, etc.
+	- Informacion de seguridad, permisos, etc.
+	- Credenciales del USUARIO
+	- Informacion sobre la memoria virtual, PGD, PTE's, etc.
+	- Procesos Hijos, una lista con todos ellos.
+	- Hilos que forman el  proceso, hay almenos uno. Aca adentro va
+	  a estar la tan famosa PCB
+	- Senales pendientes
+	- Informacion de estado del proceso
+	- Estadisticas ?
+	- Recursos que posee, como archivos, locks, etc.
+	- Infomacion correspondiente a el scheduler, este va a tomar
+	  las decisiones de scheduleo con respecto a esta informacion
+	- IPC
+	- Resource LIMITS
+	- Signal actions
+	

@@ -1,0 +1,37 @@
+- El manejador de memoria, el manejador de procesos, y todo lo que se pueda
+  meter con una interfaz lo haremos asi. 
+  Vamos a declarar una interfaz con las operaciones minimas e indispensables
+  que se van a usar por el sistema. El que quiera implementar por ejemplo
+  un manejador de memoria alternativo lo unico que tendria que hacer es 
+  "realizar" la interface. Luego a traves de algun tipo de funcion
+  lo ideal seria que el manejador nuevo, pueda reemplazar al actual en tiempo
+  de ejecucion.
+  El reemplazo seria posible si de alguna manera paramos el kernel por un 
+  instante y reemplazamos los punteros a funciones (representados por la interfaz)
+  Ademas, no nos tenemos que olvidar que vamos a tener que establecer de alguna
+  manera una correlacion con el estado del manejador de memoria antiguo (en el
+  caso de alocadores de memoria) y el nuevo. 
+  Una de las posibilidades seria especificar en la interfaz tambien
+  no solo funciones para manejar memoria por ejemplo, sino tambien
+  opciones para acceder al estado interno del actual manejador que permitan 
+  funcionar como "traductor" entre las estructuras de estado de uno al otro.
+
+- El estado total de la maquina se debe poder guardar de alguna forma.
+  Esto nos permite guardarlo en disco, enviarlo por la red a otra maquina, etc.
+
+  Existe un problema con esto, el contenido del disco tendria que ser al menos
+  similar al disco de origen, por una cuestion de binarios y librerias.
+
+  Por otro lado se podria implementar una migracion total, pero llevaria mucho
+  tiempo para redes de 100 Mbits. Por ahi para redes de 1GBbits o 10GBbits
+  no es tan irreal.
+  Para una red de 1GBit transportar 20Gbytes de informacion tardaria
+  como minimo 160 segundos redondeando la migracion seria de unos 200 segundos
+  No seria tanto.
+
+- El kernel debe poder actualizarse en tiempo de ejecucion.
+
+- Migracion de procesos hacia nodos en otras maquinas??? POr ahi puede llegar 
+  a ser util.
+
+- El sistema de archivos va a ser EXT2 por ahora, luego EXT4 si me da ganas

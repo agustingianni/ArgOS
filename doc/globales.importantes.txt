@@ -1,0 +1,11 @@
+/* KERN_TEXT_BEGIN esta un poquito mas arriba que 1MB */
+sys_info->sys_kern_start = (vaddr_t) &KERN_TEXT_BEGIN;
+
+/* De aca en mas puedo escribir hasta el fin de la memoria fisica */
+sys_info->sys_kern_end   = (vaddr_t) &KERN_TOP;
+
+/* Primer pagina usable del sistema */
+sys_info->sys_minpfn = PFN_UP(seg_start);
+
+/* Ultima pagina usable del sistema */
+sys_info->sys_maxpfn = PFN_DOWN(seg_end);

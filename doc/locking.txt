@@ -1,0 +1,56 @@
+spinlocks:
+
+	En maquinas con un solo CPU los spinlocks solamente
+	deshabilitan el kernel preemption. Esto es asi por que
+	de la  unica manera en que un acceso "simultaneo" pueda
+	suceder en el kernel es que un thread del kernel "apropio"
+	a otro y ejecute la misma parte del codigo. Si deshabilitamos
+	la "apropiacion", esto no puede suceder y el thread del kernel
+	ejecuta de principio a fin la seccion critica.
+	
+	En maquinas sin kernel preemption directamente se esfuman los
+	spinlocks. Por que no existen los spinlocks? Facil por que como no
+	hay preemption, una funcion del kernel se va a ejecutar hasta que
+	termine, nadi la va a sacar. Pero que pasa si hay una interrupcion?
+	Si hay una interrupcion no nos interesa salvo que la interrupcion
+	este "interrumpiendo" el mismo manejador de interrupciones o
+	el manejador de interrupciones acceda a una estructura de datos
+	que es accedida por funciones que no son manejadores de interrupcion.
+	En estos casos lo que debemos hacer es deshabilitar
+	las interrupciones. 
+	
+	En maquinas con MULTIPROCESADOR los spinlocks estan.
+	Si usamos spinlocks en manejadores de interrupcion, debemos 
+	primero deshabilitar la linea de interrupcion del manejador que
+	estamos programando, debido a que si llega otra interrupcion
+	en la misma linea y el spinlock esta "tomado" habria un bloqueo.
+	
+	Ejemplo de uso de spinlocks en ISR:
+	
+	spinlock_t mr_lock = SPIN_LOCK_UNLOCKED;
+	unsigned long flags;
+
+	spin_lock_irqsave(&mr_lock, flags);
+	{
+	/* critical region ... */
+	}
+	spin_unlock_irqrestore(&mr_lock, flags);
+	
+semaphores:
+
+	Los semaforos son usados en las rutinas que pueden "sleepear". Ademas
+	tambien se usa si un lock, debe ser obtenido durante un tiempo largo
+	A diferencia de los spinlocks, los semaforos, no deshabilitan kernel
+	preemption por lo que no agregan latencia de scheduleo.
+	
+	Los semaforos se inicializan con un numero llamado count que cuenta
+	la cantidad de threads de ejecucion que pueden estar actualmente 
+	reteniendo el semaforo. Los semaforos con un count = 1 se llaman 
+	mutex o semaforos binarios.
+	
+  Requirement				Recommended Lock
+  Low overhead locking		Spin lock is preferred
+  Short lock hold time		Spin lock is preferred
+  Long lock hold time		Semaphore is preferred
+  Interrupt context			Spin lock is required
+  Sleep while holding lock	Semaphore is required

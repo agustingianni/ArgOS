@@ -1,0 +1,259 @@
+http://tldp.org/HOWTO/Linux-i386-Boot-Code-HOWTO/kernel_head.html
+
+arch/i386/kernel/head.S:
+	
+	ENTRY(startup_32):
+
+		- Load a "boot" GDT
+
+		  lgdt boot_gdt_descr - __PAGE_OFFSET
+
+		  #define GDT_ENTRY_BOOT_CS	2
+		  #define __BOOT_CS		(GDT_ENTRY_BOOT_CS * 8)
+		  #define GDT_ENTRY_BOOT_DS 	(GDT_ENTRY_BOOT_CS + 1)
+		  #define __BOOT_DS		(GDT_ENTRY_BOOT_DS * 8)
+
+		  #define __PAGE_OFFSET		0xc0000000
+
+		  boot_gdt_descr:
+		  	.word __BOOT_DS+7
+			.long boot_gdt_table - __PAGE_OFFSET
+
+		  boot_gdt_table:
+			.fill GDT_ENTRY_BOOT_CS,8,0
+			.quad 0x00cf9a000000ffff	/* kernel 4GB code at 0x00000000 */
+			.quad 0x00cf92000000ffff	/* kernel 4GB data at 0x00000000 */
+
+		- Clear the ".bss" section:
+
+		  	xorl %eax,%eax
+			movl $__bss_start - __PAGE_OFFSET,%edi
+			movl $__bss_stop - __PAGE_OFFSET,%ecx
+			subl %edi,%ecx
+			shrl $2,%ecx
+			rep ; stosl
+
+		- Make a copy of the boot parameters
+
+		  boot_params - __PAGE_OFFSET
+
+		- Initialize the paging system
+
+		- Setup stack pointer
+			
+			lss stack_start,%esp
+
+		- Clear CFLAGS
+
+			pushl $0
+			popfl
+
+		- Setup the IDT (but it does not load it):
+		
+		  /* dummy ISR */
+		  ignore_int:
+
+			cld
+			iret
+
+		  /* setup the IDT 
+		   * void setup_idt(void);
+		   */
+		  setup_idt:
+			/* set the default handler for all the 256 entries */
+			lea ignore_int,%edx
+			movl $(__KERNEL_CS << 16),%eax
+			movw %dx,%ax		/* selector = 0x0010 = cs */
+			movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
+
+			lea idt_table,%edi	/* load the address of idt_table */
+			mov $256,%ecx		/* we have 256 entries */
+			
+			/* fill 'idt_table' with dummy entries
+			   each entry is 8 bytes long */
+			rp_sidt:
+			movl %eax,(%edi)	/* *(edi + 0) = eax */
+			movl %edx,4(%edi)	/* *(edi + 4) = edx */
+			addl $8,%edi		/* edi += 8 */
+			dec %ecx
+			jne rp_sidt
+
+			set_early_handler handler=early_divide_err,trapno=0
+			set_early_handler handler=early_illegal_opcode,trapno=6
+			set_early_handler handler=early_protection_fault,trapno=13
+			set_early_handler handler=early_page_fault,trapno=14
+			
+			/* early_* are functions that handles traps,
+			   the only action they take is to call void early_fault(void);
+			   and halt the cpu */
+
+			/* now we have the IDT prepared an we return */
+			ret
+
+		  /* void early_fault(void);*/
+		  early_fault:
+			cld
+			hlt_loop:
+			hlt
+			jmp hlt_loop
+
+
+		  /* this macro is used by void setup_idt(void) to 
+		     set the default handlers */
+		  .macro	set_early_handler handler,trapno
+			lea \handler,%edx
+			movl $(__KERNEL_CS << 16),%eax
+			movw %dx,%ax
+			movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
+			lea idt_table,%edi
+			movl %eax,8*\trapno(%edi)
+			movl %edx,8*\trapno+4(%edi)
+		  .endm
+
+
+		- Gather CPU Information and store it:
+
+		- Check for a floating point unit (FPU) and initialize it
+			
+			/* check's for Intel 287 or 387 coprocessor
+			 * if it is present set X86_HARD_MATH */ 
+			call check_x87
+
+		- Initialize PDA (Per-processor private data areas)
+			/* PDA is an entry in the GDT */
+			call setup_pda
+
+		- Load the GDT and IDT:
+			
+			#define GDT_ENTRIES 32
+			#define GDT_SIZE (GDT_ENTRIES * 8)
+
+			/* the early GDT descriptor */
+			ENTRY(early_gdt_descr)
+			.word GDT_ENTRIES*8-1
+			.long cpu_gdt_table
+		
+			/* early GDT table */
+			ENTRY(cpu_gdt_table)
+			.quad 0x0000000000000000 /* NULL descriptor */
+			.quad 0x0000000000000000 /* 0x0b reserved */
+			.quad 0x0000000000000000 /* 0x13 reserved */
+			.quad 0x0000000000000000 /* 0x1b reserved */
+			.quad 0x0000000000000000 /* 0x20 unused */
+			.quad 0x0000000000000000 /* 0x28 unused */
+			.quad 0x0000000000000000 /* 0x33 TLS entry 1 */
+			.quad 0x0000000000000000 /* 0x3b TLS entry 2 */
+			.quad 0x0000000000000000 /* 0x43 TLS entry 3 */
+			.quad 0x0000000000000000 /* 0x4b reserved */
+			.quad 0x0000000000000000 /* 0x53 reserved */
+			.quad 0x0000000000000000 /* 0x5b reserved */
+	
+			.quad 0x00cf9a000000ffff /* 0x60 kernel 4GB code at 0x00000000 */
+			.quad 0x00cf92000000ffff /* 0x68 kernel 4GB data at 0x00000000 */
+			.quad 0x00cffa000000ffff /* 0x73 user 4GB code at 0x00000000 */
+			.quad 0x00cff2000000ffff /* 0x7b user 4GB data at 0x00000000 */
+
+			.quad 0x0000000000000000 /* 0x80 TSS descriptor */
+			.quad 0x0000000000000000 /* 0x88 LDT descriptor */
+
+			/*
+	 		 * Segments used for calling PnP BIOS have byte granularity.
+			 * They code segments and data segments have fixed 64k limits,
+			 * the transfer segment sizes are set at run time.
+			 */
+			.quad 0x00409a000000ffff /* 0x90 32-bit code */
+			.quad 0x00009a000000ffff /* 0x98 16-bit code */
+			.quad 0x000092000000ffff /* 0xa0 16-bit data */
+			.quad 0x0000920000000000 /* 0xa8 16-bit data */
+			.quad 0x0000920000000000 /* 0xb0 16-bit data */
+
+			/*
+			 * The APM segments have byte granularity and their bases
+			 * are set at run time.  All have 64k limits.
+			 */
+			.quad 0x00409a000000ffff /* 0xb8 APM CS    code */
+			.quad 0x00009a000000ffff /* 0xc0 APM CS 16 code (16 bit) */
+			.quad 0x004092000000ffff /* 0xc8 APM DS    data */
+ 			.quad 0x00c0920000000000 /* 0xd0 - ESPFIX SS */
+			.quad 0x00cf92000000ffff /* 0xd8 - PDA */
+			.quad 0x0000000000000000 /* 0xe0 - unused */
+			.quad 0x0000000000000000 /* 0xe8 - unused */
+			.quad 0x0000000000000000 /* 0xf0 - unused */
+			.quad 0x0000000000000000 /* 0xf8 - GDT entry 31:double-fault TSS */
+
+			#define IDT_ENTRIES 256
+			
+			/* this structure will be used by lidt x86 instruction */
+			idt_descr:
+			.word IDT_ENTRIES*8-1		# idt contains 256 entries
+			.long idt_table
+
+			/* load the GDT */
+			lgdt early_gdt_descr
+		
+			/* now we load the IDT that we've setup before */
+			lidt idt_descr
+		
+			/* clear the prefetch queue by doing a inter segment
+			 * jump (so the CPU has to load the code segment selector
+			 * , in this case __KEREL_CS).
+			 */
+			ljmp $(__KERNEL_CS),$1f
+
+			/* reload all the segment registers */
+		1:	movl $(__KERNEL_DS),%eax
+
+			/* after changing gdt. The stact selector points
+			 * to the kernel data section
+			 */
+			movl %eax,%ss
+
+			/* DS/ES contains default USER segment. Same as above, but
+			 * they now point to the user segment
+			 */
+			movl $(__USER_DS),%eax
+			movl %eax,%ds
+			movl %eax,%es
+
+			/* Clear GS and LDT */
+			xorl %eax,%eax
+			movl %eax,%gs
+			lldt %ax
+
+			/* fs selector points to the cpu private data area */
+			movl $(__KERNEL_PDA),%eax
+			mov  %eax,%fs
+	
+		- Now set up the environment so GCC is happy:
+
+			/* gcc2 wants the direction flag cleared at all times */
+			cld
+
+			/* fake return address for unwinder, we use jmp
+			   to call que kernel entry point, so we can control
+			   the eip */
+			pushl $0
+		
+			/* now we jump to the kernel entry point
+			 * asmlinkage void __init start_kernel(void);*/
+			jmp start_kernel
+
+
+init/main.c:
+
+	/* Some used macros */
+	#define __init	__attribute__ ((__section__ (".init.text")))
+
+	/* For asmlinkage help see: http://kernelnewbies.org/FAQ/asmlinkage */
+	#define asmlinkage __attribute__((regparm(0)))
+
+	/* this is the kernel entry point */
+	asmlinkage void __init start_kernel(void)
+	{
+
+	}
+
+	
+		
+
+
